@@ -146,8 +146,7 @@ struct ElevatorDefinition {
     struct Vector3 position;
     struct Quaternion rotation;
     short roomIndex;
-    short signalIndex;
-    short isExit;
+    short targetElevator;
 };
 
 struct PedestalDefinition {
@@ -160,6 +159,12 @@ struct SignageDefinition {
     struct Quaternion rotation;
     short roomIndex;
     short testChamberNumber;
+};
+
+struct BoxDropperDefinition {
+    struct Vector3 position;
+    short roomIndex;
+    short signalIndex;
 };
 
 struct LevelDefinition {
@@ -183,6 +188,7 @@ struct LevelDefinition {
     struct ElevatorDefinition* elevators;
     struct PedestalDefinition* pedestals;
     struct SignageDefinition* signage;
+    struct BoxDropperDefinition* boxDroppers;
     short collisionQuadCount;
     short staticContentCount;
     short portalSurfaceCount;
@@ -197,6 +203,7 @@ struct LevelDefinition {
     short elevatorCount;
     short pedestalCount;
     short signageCount;
+    short boxDropperCount;
     short startLocation;
 };
 

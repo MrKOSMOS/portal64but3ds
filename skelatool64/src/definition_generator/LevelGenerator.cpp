@@ -78,7 +78,7 @@ std::unique_ptr<StructureDataChunk> calculatePortalSingleSurface(CFileDefinition
     aiVector3D up;
 
     if (fabsf(normal.z) < 0.7f) {
-        right = aiVector3D(0.0f, 1.0f, 0.0f) ^ normal;
+        right = aiVector3D(0.0f, 0.0f, 1.0f) ^ normal;
         right.Normalize();
         up = normal ^ right;
     } else {
@@ -632,7 +632,9 @@ void generateElevatorDefinitions(
 
     aiMatrix4x4 baseTransform = settings.CreateCollisionTransform();
 
-    for (auto& nodeInfo : nodeGroups.NodesForType("@elevator")) {
+    auto nodes = nodeGroups.NodesForType("@elevator");
+
+    for (auto& nodeInfo : nodes) {
         if (nodeInfo.arguments.size() == 0) {
             continue;
         }
@@ -645,8 +647,25 @@ void generateElevatorDefinitions(
         elevatorData->Add(std::unique_ptr<StructureDataChunk>(new StructureDataChunk(pos)));
         elevatorData->Add(std::unique_ptr<StructureDataChunk>(new StructureDataChunk(rot)));
         elevatorData->AddPrimitive(roomOutput.RoomForNode(nodeInfo.node));
-        elevatorData->AddPrimitive(signals.SignalIndexForName(nodeInfo.arguments[0]));
-        elevatorData->AddPrimitive(nodeInfo.arguments.size() >= 2 && nodeInfo.arguments[1] == "isExit" ? 1 : 0);
+
+        if (nodeInfo.arguments.size() > 1) {
+            std::string targetElevator = nodeInfo.arguments[1];
+
+            if (targetElevator == "next_level") {
+                elevatorData->AddPrimitive(nodes.size());
+            } else {
+                unsigned targetIndex = 0;
+                for (targetIndex = 0; targetIndex < nodes.size(); ++targetIndex) {
+                    if (nodes[targetIndex].arguments.size() && nodes[targetIndex].arguments[0] == targetElevator) {
+                        break;
+                    }
+                }
+
+                elevatorData->AddPrimitive(targetIndex);
+            }
+        } else {
+            elevatorData->AddPrimitive(-1);
+        }
 
         elevators->Add(std::move(elevatorData));
         ++elevatorCount;
@@ -747,6 +766,51 @@ void generateSignageDefinitions(
     levelDef.AddPrimitive("signageCount", signageCount);
 }
 
+
+void generateBoxDropperDefinitions(
+    const aiScene* scene, 
+    CFileDefinition& fileDefinition, 
+    StructureDataChunk& levelDef, 
+    const RoomGeneratorOutput& roomOutput, 
+    const DisplayListSettings& settings,
+    NodeGroups& nodeGroups,
+    Signals& signals) {
+
+    int boxDropperCount = 0;
+    std::unique_ptr<StructureDataChunk> signage(new StructureDataChunk());
+
+    aiMatrix4x4 baseTransform = settings.CreateCollisionTransform();
+
+    for (auto& nodeInfo : nodeGroups.NodesForType("@box_dropper")) {
+        if (nodeInfo.arguments.size() == 0) {
+            continue;
+        }
+
+        std::unique_ptr<StructureDataChunk> boxDropperData(new StructureDataChunk());
+        aiVector3D pos;
+        aiQuaternion rot;
+        aiVector3D scale;
+        (baseTransform * nodeInfo.node->mTransformation).Decompose(scale, rot, pos);
+        boxDropperData->Add(std::unique_ptr<StructureDataChunk>(new StructureDataChunk(pos)));
+        boxDropperData->AddPrimitive(roomOutput.RoomForNode(nodeInfo.node));
+        boxDropperData->AddPrimitive(signals.SignalIndexForName(nodeInfo.arguments[0]));
+
+        signage->Add(std::move(boxDropperData));
+        ++boxDropperCount;
+    }
+
+    std::string boxDropperDef = fileDefinition.AddDataDefinition(
+        "box_dropper",
+        "struct BoxDropperDefinition",
+        true,
+        "_geo",
+        std::move(signage)
+    );
+
+    levelDef.AddPrimitive("boxDroppers", boxDropperDef);
+    levelDef.AddPrimitive("boxDropperCount", boxDropperCount);
+}
+
 void generateLevel(
         const aiScene* scene, 
         CFileDefinition& fileDefinition,
@@ -793,6 +857,8 @@ void generateLevel(
     generatePedestalDefinitions(scene, fileDefinition, *levelDef, roomOutput, settings, nodeGroups);
 
     generateSignageDefinitions(scene, fileDefinition, *levelDef, roomOutput, settings, nodeGroups);
+
+    generateBoxDropperDefinitions(scene, fileDefinition, *levelDef, roomOutput, settings, nodeGroups, signals);
 
     fileDefinition.AddDefinition(std::unique_ptr<FileDefinition>(new DataFileDefinition("struct LevelDefinition", fileDefinition.GetUniqueName("level"), false, "_geo", std::move(levelDef))));
 }

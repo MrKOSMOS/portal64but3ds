@@ -11,6 +11,11 @@
 
 void decorObjectRender(void* data, struct RenderScene* renderScene) {
     struct DecorObject* object = (struct DecorObject*)data;
+
+    if (!RENDER_SCENE_IS_ROOM_VISIBLE(renderScene, object->rigidBody.currentRoom)) {
+        return;
+    }
+
     Mtx* matrix = renderStateRequestMatrices(renderScene->renderState, 1);
     transformToMatrixL(&object->rigidBody.transform, matrix, SCENE_SCALE);
 
@@ -71,13 +76,17 @@ void decorObjectInit(struct DecorObject* object, struct DecorObjectDefinition* d
     }
 }
 
-void decorObjectDelete(struct DecorObject* decorObject) {
+void decorObjectClenaup(struct DecorObject* decorObject) {
     dynamicSceneRemove(decorObject->dynamicId);
     collisionSceneRemoveDynamicObject(&decorObject->collisionObject);
+}
+
+void decorObjectDelete(struct DecorObject* decorObject) {
+    decorObjectClenaup(decorObject);
     free(decorObject);
 }
 
-void decorObjectUpdate(struct DecorObject* decorObject) {
+int decorObjectUpdate(struct DecorObject* decorObject) {
     if (decorObject->playingSound != SOUND_ID_NONE) {
         soundPlayerUpdatePosition(decorObject->playingSound, &decorObject->rigidBody.transform.position);
     }
@@ -97,5 +106,11 @@ void decorObjectUpdate(struct DecorObject* decorObject) {
         decorObject->fizzleTime += FIZZLE_TIME_STEP;
         decorObject->collisionObject.body->flags &= ~RigidBodyFlagsGrabbable;
         decorObject->collisionObject.body->flags |= RigidBodyDisableGravity;
+
+        if (decorObject->fizzleTime > 1.0f) {
+            return 0;
+        }
     }
+
+    return 1;
 }

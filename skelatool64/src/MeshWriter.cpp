@@ -9,7 +9,7 @@
 
 MaterialCollector::MaterialCollector(): mSceneCount(0) {}
 
-void useTexture(std::set<std::shared_ptr<TextureDefinition>>& usedTextures, std::shared_ptr<TextureDefinition> texture, CFileDefinition& fileDefinition, const std::string& fileSuffix) {
+void useTexture(std::set<std::shared_ptr<TextureDefinition>>& usedTextures, std::set<std::shared_ptr<PalleteDefinition>>& usedPalletes, std::shared_ptr<TextureDefinition> texture, CFileDefinition& fileDefinition, const std::string& fileSuffix) {
     if (usedTextures.find(texture) != usedTextures.end()) {
         return;
     }
@@ -17,6 +17,14 @@ void useTexture(std::set<std::shared_ptr<TextureDefinition>>& usedTextures, std:
     usedTextures.insert(texture);
 
     fileDefinition.AddDefinition(std::move(texture->GenerateDefinition(fileDefinition.GetUniqueName(texture->Name()), fileSuffix)));
+
+    std::shared_ptr<PalleteDefinition> pallete = texture->GetPallete();
+    if (!pallete || usedPalletes.find(pallete) != usedPalletes.end()) {
+        return;
+    }
+
+    usedPalletes.insert(pallete);
+    fileDefinition.AddDefinition(std::move(pallete->GenerateDefinition(fileDefinition.GetUniqueName(pallete->Name()), fileSuffix)));
 }
 
 void MaterialCollector::UseMaterial(const std::string& material, DisplayListSettings& settings) {
@@ -50,12 +58,12 @@ void MaterialCollector::GenerateMaterials(DisplayListSettings& settings, CFileDe
             for (int i = 0; i < MAX_TILE_COUNT; ++i) {
                 auto tile = &material->second->mState.tiles[i];
                 if (tile->isOn && tile->texture && !settings.mDefaultMaterialState.IsTextureLoaded(tile->texture, tile->tmem)) {
-                    useTexture(mUsedTextures, tile->texture, fileDefinition, fileSuffix);
+                    useTexture(mUsedTextures, mUsedPalletes, tile->texture, fileDefinition, fileSuffix);
                 }
             }
 
             DisplayList materialDL(fileDefinition.GetUniqueName(useCount->first));
-            material->second->Write(fileDefinition, settings.mDefaultMaterialState, materialDL.GetDataChunk());
+            material->second->Write(fileDefinition, settings.mDefaultMaterialState, materialDL.GetDataChunk(), settings.mTargetCIBuffer);
             mMaterialNameMapping[useCount->first] = materialDL.GetName();
             
             auto dl = materialDL.Generate(fileSuffix);
@@ -68,6 +76,7 @@ void MaterialCollector::GenerateMaterials(DisplayListSettings& settings, CFileDe
 void generateMeshIntoDLWithMaterials(const aiScene* scene, CFileDefinition& fileDefinition, MaterialCollector* materials, std::vector<RenderChunk>& renderChunks, DisplayListSettings& settings, DisplayList &displayList, const std::string& modelSuffix) {
     RCPState rcpState(settings.mDefaultMaterialState, settings.mVertexCacheSize, settings.mMaxMatrixDepth, settings.mCanPopMultipleMatrices);
     std::set<std::shared_ptr<TextureDefinition>> usedTextures;
+    std::set<std::shared_ptr<PalleteDefinition>> usedPalletes;
 
     for (auto chunk = renderChunks.begin(); chunk != renderChunks.end(); ++chunk) {
         if (materials) {
@@ -86,11 +95,11 @@ void generateMeshIntoDLWithMaterials(const aiScene* scene, CFileDefinition& file
                     for (int i = 0; i < MAX_TILE_COUNT; ++i) {
                         auto tile = &material->second->mState.tiles[i];
                         if (tile->isOn && tile->texture && !materialState.IsTextureLoaded(tile->texture, tile->tmem)) {
-                            useTexture(usedTextures, tile->texture, fileDefinition, modelSuffix);
+                            useTexture(usedTextures, usedPalletes, tile->texture, fileDefinition, modelSuffix);
                         }
                     }
 
-                    material->second->Write(fileDefinition, materialState, displayList.GetDataChunk());
+                    material->second->Write(fileDefinition, materialState, displayList.GetDataChunk(), settings.mTargetCIBuffer);
                     applyMaterial(material->second->mState, materialState);
                 }
             }
@@ -115,7 +124,7 @@ void generateMeshIntoDLWithMaterials(const aiScene* scene, CFileDefinition& file
     }
     rcpState.TraverseToBone(nullptr, displayList);
 
-    generateMaterial(fileDefinition, rcpState.GetMaterialState(), settings.mDefaultMaterialState, displayList.GetDataChunk());
+    generateMaterial(fileDefinition, rcpState.GetMaterialState(), settings.mDefaultMaterialState, displayList.GetDataChunk(), settings.mTargetCIBuffer);
 }
 
 

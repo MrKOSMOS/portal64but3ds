@@ -22,6 +22,7 @@ bool parseCommandLineArguments(int argc, char *argv[], struct CommandLineArgumen
     output.mExportAnimation = true;
     output.mExportGeometry = true;
     output.mBonesAsVertexGroups = false;
+    output.mTargetCIBuffer = false;
     output.mOutputType = FileOutputType::Mesh;
     output.mEulerAngles = aiVector3D(0.0f, 0.0f, 0.0f);
     output.mDefaultMaterial = "default";
@@ -55,6 +56,10 @@ bool parseCommandLineArguments(int argc, char *argv[], struct CommandLineArgumen
                 output.mDefaultMaterial = curr;
             } else if (lastParameter == "force-material") {
                 output.mForceMaterialName = curr;
+            } else if (lastParameter == "pallete") {
+                output.mForcePallete = curr;
+            } else if (lastParameter == "script") {
+                output.mScriptFiles.push_back(curr);
             }
 
             lastParameter = "";
@@ -83,18 +88,26 @@ bool parseCommandLineArguments(int argc, char *argv[], struct CommandLineArgumen
             strcmp(curr, "--rotate") == 0) {
             lastParameter = "rotate";
         } else if (
+            strcmp(curr, "--pallete") == 0) {
+            lastParameter = "pallete";
+        } else if (
             strcmp(curr, "-a") == 0 || 
             strcmp(curr, "--animations-only") == 0) {
             output.mExportGeometry = false;
         } else if (strcmp(curr, "--boneless") == 0) {
             output.mBonesAsVertexGroups = true;
         } else if (strcmp(curr, "--level") == 0) {
-                    output.mOutputType = FileOutputType::Level;
-                    output.mExportAnimation = false;
+            output.mOutputType = FileOutputType::Level;
+            output.mExportAnimation = false;
         } else if (strcmp(curr, "--default-material") == 0) {
             lastParameter = "default-material";
         } else if (strcmp(curr, "--force-material") == 0) {
             lastParameter = "force-material";
+        } else if (strcmp(curr, "--script") == 0) {
+            output.mOutputType = FileOutputType::Script;
+            lastParameter = "script";
+        } else if (strcmp(curr, "--ci-buffer") == 0) {
+            output.mTargetCIBuffer = true;
         } else {
             if (curr[0] == '-') {
                 hasError = true;
